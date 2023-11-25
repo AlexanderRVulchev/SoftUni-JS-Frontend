@@ -13,7 +13,7 @@ function attachEvents() {
             body: JSON.stringify(newMessage)
         });
         nameInput.value = "";
-        contentInput = "";
+        contentInput.value = "";
     })
 
     refreshButton.addEventListener("click", async () => {
