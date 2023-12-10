@@ -1,150 +1,137 @@
-function solve() {
+function onLoad() {
     const baseUrl = "http://localhost:3030/jsonstore/tasks/";
-    let titleToEdit = "";
+    let idForEdit = "";
 
     const titleInput = document.getElementById("course-name");
     const typeInput = document.getElementById("course-type");
-    const descriptionTextArea = document.getElementById("description");
+    const descriptionInput = document.getElementById("description");
     const teacherInput = document.getElementById("teacher-name");
-    const addFormButton = document.getElementById("add-course");
-    const editFormButton = document.getElementById("edit-course");
+    const addButton = document.getElementById("add-course");
+    const editButton = document.getElementById("edit-course");
     const loadButton = document.getElementById("load-course");
-    const divUl = document.getElementById("list");
+    const listDiv = document.getElementById("list");
 
     loadButton.addEventListener("click", load);
-    addFormButton.addEventListener("click", add);
-    editFormButton.addEventListener("click", put);
-
+    addButton.addEventListener("click", add);
+    editButton.addEventListener("click", edit);
 
     // -- Event handlers
 
     async function load() {
-        divUl.innerHTML = "";
-        const courses = Object.values(await fetchAllCourses());
-
+        listDiv.innerHTML = "";
+        const courses = await fetchGet();
         for (const course of courses) {
-            const containerDiv = buildContainerDiv(course);
-            divUl.appendChild(containerDiv);
+            const [title, type, description, teacher, id] = deconstructCourseObject(course);
+            const containerDiv = buildContainerDiv(title, type, description, teacher, id);
+            listDiv.appendChild(containerDiv);
         }
-        editFormButton.disabled = true;
     }
 
-    async function add() {
+    async function add(e) {
+        e.preventDefault();
         const [title, type, description, teacher] = readInput();
         clearInput();
-
-        const data = { title, type, description, teacher };
-        await fetch(baseUrl, {
-            method: "POST",
-            body: JSON.stringify(data)
-        });
-        load();
+        await fetchPost(title, type, description, teacher);
+        await load();
     }
 
     async function edit(e) {
-        const containerDiv = e.currentTarget.parentElement;
-        titleToEdit = containerDiv.getElementsByTagName("h2")[0].textContent;
-        containerDiv.remove();
-
-        const courseToEdit = await fetchCourseByTitle(titleToEdit);
-        const [description, teacher, title, type, id] = deconstructCourseObject(courseToEdit);
-        setInput(title, type, description, teacher);
-
-        editFormButton.disabled = false;
-        addFormButton.disabled = true;
-    }
-
-    async function put() {
+        e.preventDefault();
         const [title, type, description, teacher] = readInput();
         clearInput();
-
-        const course = await fetchCourseByTitle(titleToEdit);
-        const id = course._id;
-
-        const data = { title, type, description, teacher };
-        await fetch(baseUrl + id, {
-            method: "PUT",
-            body: JSON.stringify(data)
-        });
-
-        load();
-
-        editFormButton.disabled = true;
-        addFormButton.disabled = false;
+        editButton.disabled = true;
+        addButton.disabled = false;
+        await fetchPut(title, type, description, teacher);
+        await load();
     }
 
-    async function finish(e) {
-        const containerDiv = e.currentTarget.parentElement;
-        const titleToDelete = containerDiv.getElementsByTagName("h2")[0].textContent;
+    // -- Http requests
 
-        const course = await fetchCourseByTitle(titleToDelete);
-        const id = course._id;
+    async function fetchGet() {
+        const response = await fetch(baseUrl);
+        const coursesObj = await response.json();
+        const courses = Object.values(coursesObj);
+        return Array.from(courses);
+    }
 
+    async function fetchPost(title, type, description, teacher) {
+        const data = { title, type, description, teacher }
+        await fetch(baseUrl, {
+            method: "POST",
+            body: JSON.stringify(data)
+        })
+    }
+
+    async function fetchPut(title, type, description, teacher) {
+        const data = { title, type, description, teacher }
+        await fetch(baseUrl + idForEdit, {
+            method: "PUT",
+            body: JSON.stringify(data)
+        })
+    }
+
+    async function fetchDelete(id) {
         await fetch(baseUrl + id, {
             method: "DELETE"
-        });
-        load();
+        })
     }
 
     // -- Helper functions
 
-    async function fetchAllCourses() {
-        const response = await fetch(baseUrl);
-        const courses = await response.json();
-        return courses;
+    function deconstructCourseObject(course) {
+        const title = course.title;
+        const type = course.type;
+        const description = course.description;
+        const teacher = course.teacher;
+        const id = course._id;
+        return [title, type, description, teacher, id]
     }
 
-    async function fetchCourseByTitle(title) {
-        const coursesObj = Object.values(await fetchAllCourses());
-        const coursesArray = Array.from(coursesObj);
-        const course = coursesArray.find(c => c.title === title);
-        return course;
-    }
-    
     function readInput() {
         const title = titleInput.value;
         const type = typeInput.value;
-        const description = descriptionTextArea.value;
+        const description = descriptionInput.value;
         const teacher = teacherInput.value;
         return [title, type, description, teacher];
+    }
+
+    function setInput(title, type, description, teacher) {
+        titleInput.value = title;
+        typeInput.value = type;
+        descriptionInput.value = description;
+        teacherInput.value = teacher;
     }
 
     function clearInput() {
         setInput("", "", "", "");
     }
 
-    function setInput(title, type, description, teacher) {
-        titleInput.value = title;
-        typeInput.value = type;
-        descriptionTextArea.value = description;
-        teacherInput.value = teacher;
-    }
-
-    function deconstructCourseObject(courseObj) {
-        const description = courseObj.description;
-        const teacher = courseObj.teacher;
-        const title = courseObj.title;
-        const type = courseObj.type;
-        const id = courseObj._id
-        return [description, teacher, title, type, id];
-    }
-
     // -- Html builders
 
-    function buildContainerDiv(courseObj) {
-        const [description, teacher, title, type, id] = deconstructCourseObject(courseObj);
+    function buildContainerDiv(title, type, description, teacher, id) {
         const titleH2 = buildHtmlElement("h2", title, null, null);
         const teacherH3 = buildHtmlElement("h3", teacher, null, null);
         const typeH3 = buildHtmlElement("h3", type, null, null);
         const descriptionH4 = buildHtmlElement("h4", description, null, null);
-        const editButton = buildHtmlElement("button", "Edit Course", null, ["edit-btn"]);
-        const finishButton = buildHtmlElement("button", "Finish Course", null, ["finish-btn"]);
+        const editBtn = buildHtmlElement("button", "Edit Course", null, ["edit-btn"]);
+        const finishBtn = buildHtmlElement("button", "Finish Course", null, ["finish-btn"]);
 
-        editButton.addEventListener("click", edit);
-        finishButton.addEventListener("click", finish);
+        const containerDiv = buildHtmlElement("div", null, null, ["container"], titleH2, teacherH3, typeH3, descriptionH4, editBtn, finishBtn);
 
-        const div = buildHtmlElement("div", null, null, ["container"], titleH2, teacherH3, typeH3, descriptionH4, editButton, finishButton);
-        return div;
+        editBtn.addEventListener("click", () => {
+            setInput(title, type, description, teacher);
+            containerDiv.remove();
+            idForEdit = id;
+            addButton.disabled = true;
+            editButton.disabled = false;
+        })
+
+        finishBtn.addEventListener("click", async () => {
+            await fetchDelete(id);
+            await load();
+        })
+
+        return containerDiv;
     }
 
     function buildHtmlElement(tag, text, id, classNames, ...children) {
@@ -169,4 +156,4 @@ function solve() {
     }
 }
 
-solve();
+onLoad();
