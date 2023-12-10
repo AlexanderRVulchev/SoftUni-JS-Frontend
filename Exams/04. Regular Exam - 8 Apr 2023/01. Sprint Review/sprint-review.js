@@ -5,31 +5,27 @@ function solve(input) {
         "In Progress": 0,
         "Code Review": 0,
         "Done": 0
-    };
+    }
+    const numberOfElements = Number(input.shift());
 
-    const numberOfAssignees = Number(input.shift());
-
-    for (let i = 0; i < numberOfAssignees; i++) {
-        const tokens = input.shift().split(":");
-        const [assignee, taskId, title, status, points] = tokens;
-
-        if (!sprint[assignee]) {
-            sprint[assignee] = [];
-        }
-
+    for (let i = 0; i < numberOfElements; i++) {
+        const [assignee, taskId, title, status, points] = input.shift().split(":");
+        if (!sprint.hasOwnProperty(assignee)) {
+            sprint[assignee] = []
+        };
+        tasks[status] += Number(points);
         sprint[assignee].push({ taskId, title, status, points: Number(points) });
-        updateTasks(status, points, true);
     }
 
     while (input.length > 0) {
         const [command, ...restOfTheTokens] = input.shift().split(":");
 
         if (command === "Add New") {
-            addNew(restOfTheTokens)
+            addNew(restOfTheTokens);
         } else if (command === "Change Status") {
-            changeStatus(restOfTheTokens)
+            changeStatus(restOfTheTokens);
         } else if (command === "Remove Task") {
-            removeTask(restOfTheTokens)
+            removeTask(restOfTheTokens);
         }
     }
 
@@ -37,73 +33,54 @@ function solve(input) {
     console.log(`In Progress: ${tasks["In Progress"]}pts`);
     console.log(`Code Review: ${tasks["Code Review"]}pts`);
     console.log(`Done Points: ${tasks["Done"]}pts`);
-
     if (tasks["Done"] >= tasks["ToDo"] + tasks["In Progress"] + tasks["Code Review"]) {
         console.log("Sprint was successful!");
     } else {
         console.log("Sprint was unsuccessful...");
     }
 
-    // -- Functions
-
     function addNew(tokens) {
         const [assignee, taskId, title, status, points] = tokens;
-
-        if (!assigneeExists(assignee)) {
-            return;
+        if (assigneeIsValid(assignee)) {
+            sprint[assignee].push({ taskId, title, status, points: Number(points) });
+            tasks[status] += Number(points);
         }
-        sprint[assignee].push({ taskId, title, status, points: Number(points) });
-        updateTasks(status, points, true);
     }
 
     function changeStatus(tokens) {
         const [assignee, taskId, newStatus] = tokens;
-
-        if (!assigneeExists(assignee)) {
-            return;
+        if (assigneeIsValid(assignee)) {
+            const task = sprint[assignee].find(t => t.taskId === taskId);
+            if (task) {
+                tasks[task.status] -= task.points;
+                task.status = newStatus;
+                tasks[task.status] += task.points;
+            } else {
+                console.log(`Task with ID ${taskId} does not exist for ${assignee}!`);
+            }
         }
-
-        let task = sprint[assignee].find(t => t.taskId === taskId);
-        if (!task) {
-            console.log(`Task with ID ${taskId} does not exist for ${assignee}!`);
-            return;
-        }
-
-        updateTasks(task.status, task.points, false);
-        task.status = newStatus;
-        updateTasks(task.status, task.points, true);
     }
 
     function removeTask(tokens) {
         const [assignee, indexAsString] = tokens;
         const index = Number(indexAsString);
-
-        if (!assigneeExists(assignee)) {
-            return;
+        if (assigneeIsValid(assignee)) {
+            if (index >= 0 && index < sprint[assignee].length) {
+                const task = sprint[assignee][index];
+                tasks[task.status] -= task.points;
+                sprint[assignee].splice(index, 1);
+            } else {
+                console.log(`Index is out of range!`);
+            }
         }
-
-        let task = sprint[assignee][index];
-
-        if (!task) {
-            console.log("Index is out of range!");
-            return;
-        }
-
-        updateTasks(task.status, task.points, false);
-        sprint[assignee].splice(index, 1);        
     }
 
-    function assigneeExists(assignee) {
+    function assigneeIsValid(assignee) {
         if (!sprint.hasOwnProperty(assignee)) {
             console.log(`Assignee ${assignee} does not exist on the board!`);
             return false;
         } else {
             return true;
         }
-    }
-
-    function updateTasks(status, points, toAdd) {
-        const pointsAsNumber = Number(points);
-        tasks[status] += toAdd ? pointsAsNumber : 0 - pointsAsNumber;
     }
 }
