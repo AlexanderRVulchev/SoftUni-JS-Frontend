@@ -1,122 +1,111 @@
-function onLoad() {
+function attachEvents() {
     const baseUrl = "http://localhost:3030/jsonstore/tasks/";
-    let selectedIdForEdit = "";
+    let idForEdit = "";
 
-    const loadHistoryButton = document.getElementById("load-history");
-    const listDiv = document.getElementById("list");
-    const addWeatherButton = document.getElementById("add-weather");
-    const editWeatherButton = document.getElementById("edit-weather");
     const locationInput = document.getElementById("location");
     const temperatureInput = document.getElementById("temperature");
     const dateInput = document.getElementById("date");
+    const loadButton = document.getElementById("load-history");
+    const addButton = document.getElementById("add-weather");
+    const editButton = document.getElementById("edit-weather");
+    const listUl = document.getElementById("list");
 
-    loadHistoryButton.addEventListener("click", loadHistory);
-    addWeatherButton.addEventListener("click", addWeather);
-    editWeatherButton.addEventListener("click", editWeather);
+    loadButton.addEventListener("click", load);
+    addButton.addEventListener("click", add);
+    editButton.addEventListener("click", edit);
 
-    // -- Event handlers
-
-    async function loadHistory() {
-        const response = await fetch(baseUrl);
-        const records = await response.json();
-        listDiv.innerHTML = "";
-
-        for (const record of Object.values(records)) {
-            listDiv.appendChild(buildRecordItem(record.date, record.location, record.temperature, record._id));
+    async function load() {
+        listUl.innerHTML = "";
+        const records = await fetchAllRecords();
+        for (const record of records) {
+            const recordContainerDiv = buildRecordContainerDiv(record.location, record.temperature, record.date, record._id);
+            listUl.appendChild(recordContainerDiv);
         }
     }
 
-    async function addWeather() {
-        const location = locationInput.value;
-        const temperature = temperatureInput.value;
-        const date = dateInput.value;
-        resetInput();
-
+    async function add() {
+        const [location, temperature, date] = readInput();
+        clearInput();
         const data = { location, temperature, date };
 
         await fetch(baseUrl, {
             method: "POST",
             body: JSON.stringify(data)
-        });      
+        });
 
-        await loadHistory();
+        await load();
     }
 
-    function changeRecord(e) {
-        selectedIdForEdit = e.currentTarget.id;
-        const containerDiv = e.currentTarget.parentElement.parentElement;
-        const recordChildrenElements = Array.from(containerDiv.children);
+    async function edit() {
+        const [location, temperature, date] = readInput();
+        clearInput();
 
-        const location = recordChildrenElements[0].textContent;
-        const date = recordChildrenElements[1].textContent;
-        const temperature = recordChildrenElements[2].textContent;
+        editButton.disabled = true;
+        addButton.disabled = false;
 
-        containerDiv.remove();
-
-        locationInput.value = location;
-        dateInput.value = date;
-        temperatureInput.value = temperature;
-
-        editWeatherButton.disabled = false;
-        addWeatherButton.disabled = true;
-    }
-
-    async function editWeather(e) {
-        const location = locationInput.value;
-        const temperature = temperatureInput.value;
-        const date = dateInput.value;
-        
-        resetInput();
-
-        const data = { location, temperature, date, _id: selectedIdForEdit };
-
-        await fetch(baseUrl + selectedIdForEdit, {
+        const data = { location, temperature, date };
+        await fetch(baseUrl + idForEdit, {
             method: "PUT",
             body: JSON.stringify(data)
         });
 
-        await loadHistory();
-
-        editWeatherButton.disabled = true;
-        addWeatherButton.disabled = false;
+        await load();
     }
 
-    async function deleteRecord(e) {
-        idToDelete = e.currentTarget.id;
-
-        await fetch(baseUrl + idToDelete, {
-            method: "DELETE"
-        })
-
-        await loadHistory();
+    async function fetchAllRecords() {
+        const response = await fetch(baseUrl);
+        const recordsObj = await response.json();
+        return Array.from(Object.values(recordsObj));
     }
 
-    function resetInput() {
-        locationInput.value = "";
-        temperatureInput.value = "";
-        dateInput.value = "";
+    function readInput() {
+        const location = locationInput.value;
+        const temperature = temperatureInput.value;
+        const date = dateInput.value;
+        return [location, temperature, date];
     }
 
-    // -- Html builders
+    function setInput(location, temperature, date) {
+        locationInput.value = location;
+        temperatureInput.value = temperature;
+        dateInput.value = date;
+    }
 
-    function buildRecordItem(date, location, temperature, id) {
-        const cityH2 = buildHtmlElement("h2", location, null, null);
+    function clearInput() {
+        setInput("", "", "");
+    }
+
+    function buildRecordContainerDiv(location, temperature, date, id) {
+        const changeButton = buildHtmlElement("button", "Change", null, ["change-btn"]);
+        const deleteButton = buildHtmlElement("button", "Delete", null, ["delete-btn"]);
+
+        const locationH2 = buildHtmlElement("h2", location, null, null);
         const dateH3 = buildHtmlElement("h3", date, null, null);
         const temperatureH3 = buildHtmlElement("h3", temperature, "celsius", null);
+        const buttonsContainerDiv = buildHtmlElement("div", null, "buttons-container", null, changeButton, deleteButton);
 
-        const buttonChange = buildHtmlElement("button", "Change", id, "change-btn");
-        const buttonDelete = buildHtmlElement("button", "Delete", id, "delete-btn");
-        const buttonsDiv = buildHtmlElement("div", null, null, "buttons-container", buttonChange, buttonDelete);
+        const divContainer = buildHtmlElement("div", null, null, ["container"], locationH2, dateH3, temperatureH3, buttonsContainerDiv);
 
-        const containerDiv = buildHtmlElement("div", null, null, "container", cityH2, dateH3, temperatureH3, buttonsDiv);
+        changeButton.addEventListener("click", () => {
+            setInput(location, temperature, date);
+            divContainer.remove();
+            idForEdit = id;
+            addButton.disabled = true;
+            editButton.disabled = false;
+        })
 
-        buttonChange.addEventListener("click", changeRecord);
-        buttonDelete.addEventListener("click", deleteRecord);
+        deleteButton.addEventListener("click", async () => {           
+            await fetch(baseUrl + id, {
+                method: "DELETE"
+            })
 
-        return containerDiv;
+            await load();
+        })
+
+        return divContainer;
     }
 
-    function buildHtmlElement(tag, text, id, className, ...children) {
+    function buildHtmlElement(tag, text, id, classNames, ...children) {
         const element = document.createElement(tag);
         if (text !== null) {
             element.textContent = text;
@@ -124,8 +113,10 @@ function onLoad() {
         if (id !== null) {
             element.id = id;
         }
-        if (className !== null) {
-            element.classList.add(className);
+        if (classNames !== null) {
+            classNames.forEach(className => {
+                element.classList.add(className);
+            });
         }
 
         for (const child of children) {
@@ -136,4 +127,4 @@ function onLoad() {
     }
 }
 
-onLoad();
+attachEvents();
