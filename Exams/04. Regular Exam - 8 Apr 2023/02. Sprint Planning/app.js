@@ -1,72 +1,50 @@
-window.addEventListener('load', solve);
+//window.addEventListener('load', solve);
 
 function solve() {
-    const symbolsByOption = {
-        "Feature": " &#8865",
-        "Low Priority Bug": " &#9737",
-        "High Priority Bug": " &#9888"
-    }
-
-    let nextIdNumber = 1;
     let totalPoints = 0;
+    let taskNumber = 1;
 
-    const taskIdInput = document.getElementById("task-id");
     const titleInput = document.getElementById("title");
     const descriptionInput = document.getElementById("description");
     const labelSelect = document.getElementById("label");
     const pointsInput = document.getElementById("points");
     const assigneeInput = document.getElementById("assignee");
+    const taskIdHiddenInput = document.getElementById("task-id");
     const createTaskButton = document.getElementById("create-task-btn");
     const deleteTaskButton = document.getElementById("delete-task-btn");
     const tasksSection = document.getElementById("tasks-section");
     const totalPointsP = document.getElementById("total-sprint-points");
 
     createTaskButton.addEventListener("click", create);
-    deleteTaskButton.addEventListener("click", confirmDelete);
+    deleteTaskButton.addEventListener("click", deleteHandler);
 
-    
     // -- Event handlers
 
-    function create() {
+    function create(e) {
+        e.preventDefault();
         const [title, description, label, points, assignee] = readInput();
         if (title && description && label && points && assignee) {
-            const article = buildTaskArticle(title, description, label, points, assignee);
+            const article = buildArticleElement(title, description, label, points, assignee);
             tasksSection.appendChild(article);
-
-            totalPoints += Number(points);
-            totalPointsP.textContent = `Total Points ${totalPoints}pts`;
-
             clearInput();
+            setTotalPoints(points, true);
         }
     }
 
-    function loadDelete(e) {
-        const taskArticle = e.currentTarget.parentElement.parentElement;
-        const [title, description, label, points, assignee] = deconstructTaskArticle(taskArticle);
+    function deleteHandler(e) {
+        e.preventDefault();
 
-        taskIdInput.id = taskArticle.id;
+        const id = taskIdHiddenInput.value;
+        const articleToDelete = document.getElementById(id);        
+        articleToDelete.remove();        
 
-        setInput(title, description, label, points, assignee);
-        modifyDisabledInputAttribute(true);
-        createTaskButton.disabled = true;
-        deleteTaskButton.disabled = false;
-    }
+        const points = pointsInput.value;
+        setTotalPoints(points, false);        
 
-    function confirmDelete() {
-        const idToDelete = taskIdInput.id;
-        const articleToDelete = document.querySelector(`article#${idToDelete}`);
-
-        const deconstructedArticleArray = deconstructTaskArticle(articleToDelete);
-        const points = deconstructedArticleArray[3];
-        totalPoints -= Number(points);
-        totalPointsP.textContent = `Total Points ${totalPoints}pts`;
-
-        articleToDelete.remove();
         clearInput();
-        modifyDisabledInputAttribute(false);
-
+        setInputDisabledAttribute(false);
+        createTaskButton.disabled = false;
         deleteTaskButton.disabled = true;
-        createTaskButton.disabled = false;        
     }
 
     // -- Helper functions
@@ -80,11 +58,7 @@ function solve() {
         return [title, description, label, points, assignee];
     }
 
-    function clearInput() {
-        setInput("", "", "", "", "");
-    }
-
-    function setInput(title, description, label, points, assignee) {
+    function setInputValues(title, description, label, points, assignee) {
         titleInput.value = title;
         descriptionInput.value = description;
         labelSelect.value = label;
@@ -92,25 +66,7 @@ function solve() {
         assigneeInput.value = assignee;
     }
 
-    function deconstructTaskArticle(article) {
-        const articleChildren = article.children;
-
-        const unformattedLabelArray = articleChildren[0].textContent.split(" ");
-        const unformattedPointsArray = articleChildren[3].textContent.split(" ");
-        const unformattedAssignee = articleChildren[4].textContent;
-        unformattedLabelArray.pop();
-        unformattedPointsArray.pop();
-
-        const label = unformattedLabelArray.join(" ");
-        const title = articleChildren[1].textContent;
-        const description = articleChildren[2].textContent;
-        const points = unformattedPointsArray.pop();
-        const assignee = unformattedAssignee.slice("Assigned to: ".length);
-
-        return [title, description, label, points, assignee];
-    }
-
-    function modifyDisabledInputAttribute(toDisable) {
+    function setInputDisabledAttribute(toDisable) {
         titleInput.disabled = toDisable;
         descriptionInput.disabled = toDisable;
         labelSelect.disabled = toDisable;
@@ -118,29 +74,54 @@ function solve() {
         assigneeInput.disabled = toDisable;
     }
 
+    function clearInput() {
+        setInputValues("", "", "", "", "");
+    }
+
+    function setTotalPoints(points, toAdd) {
+        if (toAdd) {
+            totalPoints += Number(points);
+        } else {
+            totalPoints -= Number(points);
+        }
+        totalPointsP.innerText = `Total Points ${totalPoints}pts`;
+    }
+
     // -- Html builders
 
-    function buildTaskArticle(title, description, label, points, assignee) {
-        const classesByLabelOption = {
+    function buildArticleElement(title, description, label, points, assignee) {
+        const classByLabelValue = {
             "Feature": "feature",
             "Low Priority Bug": "low-priority",
             "High Priority Bug": "high-priority"
         };
-        const labelClass = classesByLabelOption[label];
+        const innerHtmlByLabelValue = {
+            "Feature": "Feature &#8865",
+            "Low Priority Bug": "Low Priority Bug &#9737",
+            "High Priority Bug": "High Priority Bug &#9888"
+        }
 
         const deleteButton = buildHtmlElement("button", "Delete", null, null);
-        deleteButton.addEventListener("click", loadDelete);
 
-        const labelDiv = buildHtmlElement("div", label, null, ["task-card-label", labelClass]);
-        labelDiv.innerHTML += symbolsByOption[label];
+        const labelDiv = buildHtmlElement("div", null, null, ["task-card-label", classByLabelValue[label]]);
         const titleH3 = buildHtmlElement("h3", title, null, ["task-card-title"]);
         const descriptionP = buildHtmlElement("p", description, null, ["task-card-description"]);
         const pointsDiv = buildHtmlElement("div", `Estimated at ${points} pts`, null, ["task-card-points"]);
         const assigneeDiv = buildHtmlElement("div", `Assigned to: ${assignee}`, null, ["task-card-assignee"]);
-        const actionsDiv = buildHtmlElement("div", null, null, ["task-card-actions"], deleteButton);
+        const btnContainerDiv = buildHtmlElement("div", null, null, ["task-card-actions"], deleteButton);
+        labelDiv.innerHTML = innerHtmlByLabelValue[label];
 
-        const article = buildHtmlElement("article", null, "task-" + nextIdNumber, ["task-card"], labelDiv, titleH3, descriptionP, pointsDiv, assigneeDiv, actionsDiv);
-        nextIdNumber++;
+        const article = buildHtmlElement(
+            "article", null, `task-${taskNumber++}`, ["task-card"], labelDiv, titleH3, descriptionP, pointsDiv, assigneeDiv, btnContainerDiv
+        );
+
+        deleteButton.addEventListener("click", () => {
+            setInputValues(title, description, label, points, assignee);
+            createTaskButton.disabled = true;
+            deleteTaskButton.disabled = false;
+            setInputDisabledAttribute(true);
+            taskIdHiddenInput.value = article.id;
+        });
 
         return article;
     }
